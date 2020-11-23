@@ -300,7 +300,13 @@ def getTitle(filename, use_metadata=False):
             import eyed3
             meta = eyed3.load(filename)
             if meta and meta.tag is not None:
-                return meta.tag.title
+                title_tag = meta.tag.title
+                if( len( meta.tag.comments ) > 0 ):
+                    description_tag = meta.tag.comments[0].text
+                else:
+                    description_tag = title_tag
+
+                return title_tag, description_tag
         except ImportError:
             pass
 
@@ -312,13 +318,13 @@ def getTitle(filename, use_metadata=False):
                 # file with ID3 tags
                 title = easyid3.EasyID3(filename)["title"]
                 if title:
-                    return title[0]
+                    return title[0], title[0]
             except (id3.ID3NoHeaderError, KeyError):
                 try:
                     # file with MP4 tags
                     title = easymp4.EasyMP4(filename)["title"]
                     if title:
-                        return title[0]
+                        return title[0], title[0]
                 except (mp4.MP4StreamInfoError, KeyError):
                     try:
                         # other media types
@@ -326,7 +332,7 @@ def getTitle(filename, use_metadata=False):
                         if meta is not None:
                             title = meta["title"]
                             if title:
-                                return title[0]
+                                return title[0], title[0]
                     except (KeyError, HeaderNotFoundError):
                         pass
         except ImportError:
@@ -335,7 +341,7 @@ def getTitle(filename, use_metadata=False):
     # fallback to filename as a title, remove extension though
     filename = os.path.basename(filename)
     title, _ = os.path.splitext(filename)
-    return title
+    return title, title
 
 
 def fileToItem(host, fname, pubDate, use_metadata=False):
@@ -414,10 +420,10 @@ def fileToItem(host, fname, pubDate, use_metadata=False):
     else:
         enclosure = None
 
-    title = getTitle(fname, use_metadata)
+    title, description = getTitle(fname, use_metadata)
 
     return buildItem(link=fileURL, title=title,
-                     guid=fileURL, description=title,
+                     guid=fileURL, description=description,
                      pubDate=pubDate, extraTags=[enclosure])
 
 
@@ -529,7 +535,7 @@ def main(argv=None):
         if opts.sort_creation:
             # sort files by date of creation if required
             # get files date of creation in seconds
-            pubDates = [os.path.getctime(f) for f in fileNames]
+            pubDates = [os.path.getmtime(f) for f in fileNames]
             # most feed readers will use pubDate to sort items even if they are not sorted in the output file
             # for readability, we also sort fileNames according to pubDates in the feed.
             sortedFiles = sorted(zip(fileNames, pubDates),key=lambda f: - f[1])
